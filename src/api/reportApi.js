@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = "http://localhost:5000/api/reports";
+const BASE_URL = "https://rj-solar-backend-production.up.railway.app/api/reports";
 
 const getToken = () => {
   return localStorage.getItem("token");

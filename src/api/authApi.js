@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = "http://localhost:5000/api/auth";
+const BASE_URL = "https://rj-solar-backend-production.up.railway.app/api/auth";
 
 export const signupUser = async (userData) => {
   const response = await axios.post(`${BASE_URL}/signup`, userData);

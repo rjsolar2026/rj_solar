@@ -279,7 +279,7 @@ const Reports = () => {
                 <div style={styles.cardActions}>
                   {report.filePath && (
                     <a
-                      href={`http://localhost:5000${report.filePath}`}
+                      href={`https://rj-solar-backend-production.up.railway.app/${report.filePath}`}
                       target="_blank"
                       rel="noreferrer"
                       style={styles.viewButton}
