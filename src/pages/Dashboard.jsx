@@ -4,7 +4,7 @@ const Dashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/dashboard")
+    fetch("https://rj-solar-backend-production.up.railway.app/api/dashboard")
       .then((res) => res.json())
       .then((data) => {
         console.log(data);
