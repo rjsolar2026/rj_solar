@@ -1,21 +1,18 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import {
+  getReports,
+  createReport,
+  deleteReport,
+} from "../api/reportApi";
 
 const Reports = () => {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
 
-  const [reports, setReports] = useState([
-    {
-      id: 1,
-      title: "April Sales Summary",
-      type: "Text Report",
-      category: "Sales",
-      description: "Monthly sales report for RJ SOLAR leads and orders.",
-      fileName: "No file",
-      fileType: "Text",
-      date: "2026-04-26",
-    },
-  ]);
+  const [reports, setReports] = useState([]);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const [form, setForm] = useState({
     title: "",
@@ -23,6 +20,24 @@ const Reports = () => {
     description: "",
     file: null,
   });
+
+  const fetchReports = async () => {
+    try {
+      setLoading(true);
+
+      const data = await getReports();
+
+      setReports(data.reports || []);
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to load reports");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReports();
+  }, []);
 
   const filteredReports = reports.filter((report) =>
     `${report.title} ${report.category} ${report.description} ${report.fileName}`
@@ -35,6 +50,8 @@ const Reports = () => {
       ...form,
       [e.target.name]: e.target.value,
     });
+
+    setError("");
   };
 
   const handleFileChange = (e) => {
@@ -44,39 +61,50 @@ const Reports = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const file = form.file;
+    try {
+      const formData = new FormData();
 
-    const newReport = {
-      id: Date.now(),
-      title: form.title,
-      category: form.category,
-      description: form.description,
-      type: file ? "File Report" : "Text Report",
-      fileName: file ? file.name : "No file",
-      fileType: file ? file.type || "Document" : "Text",
-      fileUrl: file ? URL.createObjectURL(file) : "",
-      date: new Date().toISOString().slice(0, 10),
-    };
+      formData.append("title", form.title);
+      formData.append("category", form.category);
+      formData.append("description", form.description);
 
-    setReports([newReport, ...reports]);
+      if (form.file) {
+        formData.append("file", form.file);
+      }
 
-    setForm({
-      title: "",
-      category: "Sales",
-      description: "",
-      file: null,
-    });
+      await createReport(formData);
 
-    setShowForm(false);
+      await fetchReports();
+
+      setForm({
+        title: "",
+        category: "Sales",
+        description: "",
+        file: null,
+      });
+
+      setShowForm(false);
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to create report");
+    }
   };
 
-  const handleDelete = (id) => {
-    const confirmDelete = window.confirm("Do you want to delete this report?");
-    if (confirmDelete) {
-      setReports(reports.filter((report) => report.id !== id));
+  const handleDelete = async (id) => {
+    const confirmDelete = window.confirm(
+      "Do you want to delete this report?"
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      await deleteReport(id);
+
+      await fetchReports();
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to delete report");
     }
   };
 
@@ -85,15 +113,21 @@ const Reports = () => {
       <div style={styles.header}>
         <div>
           <h1 style={styles.title}>Reports & Documents</h1>
+
           <p style={styles.subtitle}>
             Upload PDFs, images, documents and save important text reports
           </p>
         </div>
 
-        <button style={styles.primaryButton} onClick={() => setShowForm(true)}>
+        <button
+          style={styles.primaryButton}
+          onClick={() => setShowForm(true)}
+        >
           + Add Report
         </button>
       </div>
+
+      {error && <p style={styles.error}>{error}</p>}
 
       <div style={styles.summaryGrid}>
         <div style={styles.summaryCard}>
@@ -103,12 +137,16 @@ const Reports = () => {
 
         <div style={styles.summaryCard}>
           <p>File Reports</p>
-          <h2>{reports.filter((r) => r.type === "File Report").length}</h2>
+          <h2>
+            {reports.filter((r) => r.type === "File Report").length}
+          </h2>
         </div>
 
         <div style={styles.summaryCard}>
           <p>Text Reports</p>
-          <h2>{reports.filter((r) => r.type === "Text Report").length}</h2>
+          <h2>
+            {reports.filter((r) => r.type === "Text Report").length}
+          </h2>
         </div>
 
         <div style={styles.summaryCard}>
@@ -204,59 +242,67 @@ const Reports = () => {
           />
         </div>
 
-        <div style={styles.reportGrid}>
-          {filteredReports.map((report) => (
-            <div key={report.id} style={styles.reportCard}>
-              <div style={styles.reportTop}>
-                <span style={getCategoryStyle(report.category)}>
-                  {report.category}
-                </span>
+        {loading ? (
+          <p>Loading reports...</p>
+        ) : (
+          <div style={styles.reportGrid}>
+            {filteredReports.map((report) => (
+              <div key={report._id} style={styles.reportCard}>
+                <div style={styles.reportTop}>
+                  <span style={getCategoryStyle(report.category)}>
+                    {report.category}
+                  </span>
 
-                <span style={styles.dateBadge}>{report.date}</span>
-              </div>
+                  <span style={styles.dateBadge}>
+                    {report.createdAt?.slice(0, 10)}
+                  </span>
+                </div>
 
-              <h3 style={styles.reportTitle}>{report.title}</h3>
+                <h3 style={styles.reportTitle}>{report.title}</h3>
 
-              <p style={styles.reportText}>{report.description}</p>
+                <p style={styles.reportText}>{report.description}</p>
 
-              <div style={styles.fileBox}>
-                <p>
-                  <strong>Type:</strong> {report.type}
-                </p>
-                <p>
-                  <strong>File:</strong> {report.fileName}
-                </p>
-                <p>
-                  <strong>File Type:</strong> {report.fileType}
-                </p>
-              </div>
+                <div style={styles.fileBox}>
+                  <p>
+                    <strong>Type:</strong> {report.type}
+                  </p>
 
-              <div style={styles.cardActions}>
-                {report.fileUrl && (
-                  <a
-                    href={report.fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={styles.viewButton}
+                  <p>
+                    <strong>File:</strong> {report.fileName}
+                  </p>
+
+                  <p>
+                    <strong>File Type:</strong> {report.fileType}
+                  </p>
+                </div>
+
+                <div style={styles.cardActions}>
+                  {report.filePath && (
+                    <a
+                      href={`http://localhost:5000${report.filePath}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={styles.viewButton}
+                    >
+                      View File
+                    </a>
+                  )}
+
+                  <button
+                    style={styles.deleteButton}
+                    onClick={() => handleDelete(report._id)}
                   >
-                    View File
-                  </a>
-                )}
-
-                <button
-                  style={styles.deleteButton}
-                  onClick={() => handleDelete(report.id)}
-                >
-                  Delete
-                </button>
+                    Delete
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
 
-          {filteredReports.length === 0 && (
-            <div style={styles.empty}>No reports found</div>
-          )}
-        </div>
+            {filteredReports.length === 0 && (
+              <div style={styles.empty}>No reports found</div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -307,6 +353,13 @@ const styles = {
   subtitle: {
     marginTop: "6px",
     color: "#6b7280",
+  },
+  error: {
+    background: "#fee2e2",
+    color: "#b91c1c",
+    padding: "12px",
+    borderRadius: "10px",
+    marginBottom: "15px",
   },
   primaryButton: {
     background: "#008c45",

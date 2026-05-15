@@ -1,36 +1,18 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import {
+  getOrders,
+  createOrder,
+  updateOrder,
+  deleteOrder,
+} from "../api/orderApi";
 
 const Orders = () => {
   const [search, setSearch] = useState("");
+  const [orders, setOrders] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-
-  const [orders, setOrders] = useState([
-    {
-      id: 1,
-      orderNo: "RJO-1001",
-      customer: "Amit Sharma",
-      phone: "9876543210",
-      project: "5kW Rooftop Solar",
-      amount: 145000,
-      status: "Material Ready",
-      orderDate: "2026-04-20",
-      deliveryDate: "2026-04-28",
-      notes: "Panel and inverter ready for dispatch.",
-    },
-    {
-      id: 2,
-      orderNo: "RJO-1002",
-      customer: "Priya Singh",
-      phone: "9123456780",
-      project: "Solar Street Light",
-      amount: 58000,
-      status: "Pending",
-      orderDate: "2026-04-21",
-      deliveryDate: "2026-04-30",
-      notes: "Waiting for stock confirmation.",
-    },
-  ]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const [form, setForm] = useState({
     customer: "",
@@ -43,10 +25,31 @@ const Orders = () => {
     notes: "",
   });
 
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const data = await getOrders();
+      setOrders(data.orders || []);
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to load orders");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
   const filteredOrders = orders.filter((order) =>
     `${order.orderNo} ${order.customer} ${order.phone} ${order.project} ${order.status}`
       .toLowerCase()
       .includes(search.toLowerCase())
+  );
+
+  const totalOrderValue = orders.reduce(
+    (sum, order) => sum + Number(order.amount || 0),
+    0
   );
 
   const resetForm = () => {
@@ -65,61 +68,54 @@ const Orders = () => {
   };
 
   const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
+    setForm({ ...form, [e.target.name]: e.target.value });
+    setError("");
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (editingId) {
-      setOrders(
-        orders.map((order) =>
-          order.id === editingId
-            ? { ...order, ...form, amount: Number(form.amount) }
-            : order
-        )
-      );
-    } else {
-      const newOrder = {
-        id: Date.now(),
-        orderNo: `RJO-${Date.now().toString().slice(-5)}`,
-        ...form,
-        amount: Number(form.amount),
-      };
+    try {
+      if (editingId) {
+        await updateOrder(editingId, form);
+      } else {
+        await createOrder(form);
+      }
 
-      setOrders([newOrder, ...orders]);
+      await fetchOrders();
+      resetForm();
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to save order");
     }
-
-    resetForm();
   };
 
   const handleEdit = (order) => {
     setForm({
-      customer: order.customer,
-      phone: order.phone,
-      project: order.project,
-      amount: order.amount,
-      status: order.status,
-      orderDate: order.orderDate,
-      deliveryDate: order.deliveryDate,
-      notes: order.notes,
+      customer: order.customer || "",
+      phone: order.phone || "",
+      project: order.project || "",
+      amount: order.amount || "",
+      status: order.status || "Pending",
+      orderDate: order.orderDate ? order.orderDate.slice(0, 10) : "",
+      deliveryDate: order.deliveryDate ? order.deliveryDate.slice(0, 10) : "",
+      notes: order.notes || "",
     });
 
-    setEditingId(order.id);
+    setEditingId(order._id);
     setShowForm(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     const confirmDelete = window.confirm("Do you want to delete this order?");
-    if (confirmDelete) {
-      setOrders(orders.filter((order) => order.id !== id));
+    if (!confirmDelete) return;
+
+    try {
+      await deleteOrder(id);
+      await fetchOrders();
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to delete order");
     }
   };
-
-  const totalOrderValue = orders.reduce((sum, order) => sum + order.amount, 0);
 
   return (
     <div style={styles.page}>
@@ -135,6 +131,8 @@ const Orders = () => {
           + Create Order
         </button>
       </div>
+
+      {error && <p style={styles.error}>{error}</p>}
 
       <div style={styles.summaryGrid}>
         <div style={styles.summaryCard}>
@@ -278,59 +276,77 @@ const Orders = () => {
           />
         </div>
 
-        <div style={styles.tableWrapper}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Order No</th>
-                <th style={styles.th}>Customer</th>
-                <th style={styles.th}>Phone</th>
-                <th style={styles.th}>Project</th>
-                <th style={styles.th}>Amount</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>Order Date</th>
-                <th style={styles.th}>Delivery</th>
-                <th style={styles.th}>Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {filteredOrders.map((order) => (
-                <tr key={order.id}>
-                  <td style={styles.td}>{order.orderNo}</td>
-                  <td style={styles.td}>{order.customer}</td>
-                  <td style={styles.td}>{order.phone}</td>
-                  <td style={styles.td}>{order.project}</td>
-                  <td style={styles.td}>₹{order.amount.toLocaleString()}</td>
-                  <td style={styles.td}>
-                    <span style={getStatusStyle(order.status)}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td style={styles.td}>{order.orderDate}</td>
-                  <td style={styles.td}>{order.deliveryDate}</td>
-                  <td style={styles.td}>
-                    <button style={styles.editButton} onClick={() => handleEdit(order)}>
-                      Edit
-                    </button>
-
-                    <button style={styles.deleteButton} onClick={() => handleDelete(order.id)}>
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-
-              {filteredOrders.length === 0 && (
+        {loading ? (
+          <p>Loading orders...</p>
+        ) : (
+          <div style={styles.tableWrapper}>
+            <table style={styles.table}>
+              <thead>
                 <tr>
-                  <td style={styles.empty} colSpan="9">
-                    No orders found
-                  </td>
+                  <th style={styles.th}>Order No</th>
+                  <th style={styles.th}>Customer</th>
+                  <th style={styles.th}>Phone</th>
+                  <th style={styles.th}>Project</th>
+                  <th style={styles.th}>Amount</th>
+                  <th style={styles.th}>Status</th>
+                  <th style={styles.th}>Order Date</th>
+                  <th style={styles.th}>Delivery</th>
+                  <th style={styles.th}>Actions</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+
+              <tbody>
+                {filteredOrders.map((order) => (
+                  <tr key={order._id}>
+                    <td style={styles.td}>{order.orderNo}</td>
+                    <td style={styles.td}>{order.customer}</td>
+                    <td style={styles.td}>{order.phone}</td>
+                    <td style={styles.td}>{order.project}</td>
+                    <td style={styles.td}>
+                      ₹{Number(order.amount || 0).toLocaleString()}
+                    </td>
+                    <td style={styles.td}>
+                      <span style={getStatusStyle(order.status)}>
+                        {order.status}
+                      </span>
+                    </td>
+                    <td style={styles.td}>
+                      {order.orderDate ? order.orderDate.slice(0, 10) : ""}
+                    </td>
+                    <td style={styles.td}>
+                      {order.deliveryDate
+                        ? order.deliveryDate.slice(0, 10)
+                        : ""}
+                    </td>
+                    <td style={styles.td}>
+                      <button
+                        style={styles.editButton}
+                        onClick={() => handleEdit(order)}
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        style={styles.deleteButton}
+                        onClick={() => handleDelete(order._id)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+
+                {filteredOrders.length === 0 && (
+                  <tr>
+                    <td style={styles.empty} colSpan="9">
+                      No orders found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -378,6 +394,13 @@ const styles = {
   subtitle: {
     marginTop: "6px",
     color: "#6b7280",
+  },
+  error: {
+    background: "#fee2e2",
+    color: "#b91c1c",
+    padding: "12px",
+    borderRadius: "10px",
+    marginBottom: "15px",
   },
   primaryButton: {
     background: "#008c45",

@@ -1,59 +1,49 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import {
+  getUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+} from "../api/userApi";
 
 const Users = () => {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
-  const [users, setUsers] = useState([
-    {
-      id: 1,
-      name: "Admin",
-      email: "admin@rjsolar.com",
-      phone: "9876543210",
-      role: "Admin",
-      department: "Management",
-      status: "Active",
-      permissions: "Full Access",
-      notes: "Main CRM administrator",
-    },
-    {
-      id: 2,
-      name: "Sales Team",
-      email: "sales@rjsolar.com",
-      phone: "9123456780",
-      role: "Sales",
-      department: "Sales",
-      status: "Active",
-      permissions: "Leads, Customers, Quotations",
-      notes: "Handles customer enquiries and follow-ups",
-    },
-    {
-      id: 3,
-      name: "Store Manager",
-      email: "store@rjsolar.com",
-      phone: "9988776655",
-      role: "Inventory",
-      department: "Stock",
-      status: "Active",
-      permissions: "Stock, Suppliers",
-      notes: "Manages inventory and suppliers",
-    },
-  ]);
+  const [users, setUsers] = useState([]);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const [form, setForm] = useState({
     name: "",
     email: "",
-    phone: "",
+    password: "",
     role: "Sales",
-    department: "Sales",
     status: "Active",
-    permissions: "Leads",
-    notes: "",
   });
 
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+
+      const data = await getUsers();
+
+      setUsers(data.users || []);
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to load users");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
   const filteredUsers = users.filter((user) =>
-    `${user.name} ${user.email} ${user.phone} ${user.role} ${user.department} ${user.status}`
+    `${user.name} ${user.email} ${user.role} ${user.status}`
       .toLowerCase()
       .includes(search.toLowerCase())
   );
@@ -62,13 +52,11 @@ const Users = () => {
     setForm({
       name: "",
       email: "",
-      phone: "",
+      password: "",
       role: "Sales",
-      department: "Sales",
       status: "Active",
-      permissions: "Leads",
-      notes: "",
     });
+
     setEditingId(null);
     setShowForm(false);
   };
@@ -78,49 +66,50 @@ const Users = () => {
       ...form,
       [e.target.name]: e.target.value,
     });
+
+    setError("");
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (editingId) {
-      setUsers(
-        users.map((user) =>
-          user.id === editingId ? { ...user, ...form } : user
-        )
-      );
-    } else {
-      const newUser = {
-        id: Date.now(),
-        ...form,
-      };
+    try {
+      if (editingId) {
+        await updateUser(editingId, form);
+      } else {
+        await createUser(form);
+      }
 
-      setUsers([newUser, ...users]);
+      await fetchUsers();
+      resetForm();
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to save user");
     }
-
-    resetForm();
   };
 
   const handleEdit = (user) => {
     setForm({
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      role: user.role,
-      department: user.department,
-      status: user.status,
-      permissions: user.permissions,
-      notes: user.notes,
+      name: user.name || "",
+      email: user.email || "",
+      password: "",
+      role: user.role || "Sales",
+      status: user.status || "Active",
     });
 
-    setEditingId(user.id);
+    setEditingId(user._id);
     setShowForm(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     const confirmDelete = window.confirm("Do you want to delete this user?");
-    if (confirmDelete) {
-      setUsers(users.filter((user) => user.id !== id));
+
+    if (!confirmDelete) return;
+
+    try {
+      await deleteUser(id);
+      await fetchUsers();
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to delete user");
     }
   };
 
@@ -129,8 +118,9 @@ const Users = () => {
       <div style={styles.header}>
         <div>
           <h1 style={styles.title}>Users</h1>
+
           <p style={styles.subtitle}>
-            Manage RJ SOLAR CRM users, roles and access permissions
+            Manage RJ SOLAR CRM users and roles
           </p>
         </div>
 
@@ -138,6 +128,8 @@ const Users = () => {
           + Add User
         </button>
       </div>
+
+      {error && <p style={styles.error}>{error}</p>}
 
       <div style={styles.summaryGrid}>
         <div style={styles.summaryCard}>
@@ -151,7 +143,7 @@ const Users = () => {
         </div>
 
         <div style={styles.summaryCard}>
-          <p>Admin Users</p>
+          <p>Admins</p>
           <h2>{users.filter((u) => u.role === "Admin").length}</h2>
         </div>
 
@@ -190,10 +182,14 @@ const Users = () => {
               />
 
               <input
-                type="text"
-                name="phone"
-                placeholder="Phone Number"
-                value={form.phone}
+                type="password"
+                name="password"
+                placeholder={
+                  editingId
+                    ? "Leave blank to keep current password"
+                    : "Password"
+                }
+                value={form.password}
                 onChange={handleChange}
                 style={styles.input}
               />
@@ -208,23 +204,8 @@ const Users = () => {
                 <option>Sales</option>
                 <option>Inventory</option>
                 <option>Accounts</option>
-                <option>Installation</option>
                 <option>Service</option>
                 <option>Viewer</option>
-              </select>
-
-              <select
-                name="department"
-                value={form.department}
-                onChange={handleChange}
-                style={styles.input}
-              >
-                <option>Management</option>
-                <option>Sales</option>
-                <option>Stock</option>
-                <option>Accounts</option>
-                <option>Installation</option>
-                <option>Service</option>
               </select>
 
               <select
@@ -237,37 +218,18 @@ const Users = () => {
                 <option>Inactive</option>
                 <option>Blocked</option>
               </select>
-
-              <select
-                name="permissions"
-                value={form.permissions}
-                onChange={handleChange}
-                style={styles.input}
-              >
-                <option>Full Access</option>
-                <option>Leads</option>
-                <option>Leads, Customers, Quotations</option>
-                <option>Stock, Suppliers</option>
-                <option>Orders, Payments</option>
-                <option>Service Only</option>
-                <option>View Only</option>
-              </select>
             </div>
-
-            <textarea
-              name="notes"
-              placeholder="User Notes"
-              value={form.notes}
-              onChange={handleChange}
-              style={styles.textarea}
-            />
 
             <div style={styles.formActions}>
               <button type="submit" style={styles.saveButton}>
                 {editingId ? "Update User" : "Save User"}
               </button>
 
-              <button type="button" style={styles.cancelButton} onClick={resetForm}>
+              <button
+                type="button"
+                style={styles.cancelButton}
+                onClick={resetForm}
+              >
                 Cancel
               </button>
             </div>
@@ -288,65 +250,73 @@ const Users = () => {
           />
         </div>
 
-        <div style={styles.tableWrapper}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Name</th>
-                <th style={styles.th}>Email</th>
-                <th style={styles.th}>Phone</th>
-                <th style={styles.th}>Role</th>
-                <th style={styles.th}>Department</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>Permissions</th>
-                <th style={styles.th}>Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {filteredUsers.map((user) => (
-                <tr key={user.id}>
-                  <td style={styles.td}>{user.name}</td>
-                  <td style={styles.td}>{user.email}</td>
-                  <td style={styles.td}>{user.phone}</td>
-                  <td style={styles.td}>
-                    <span style={getRoleStyle(user.role)}>{user.role}</span>
-                  </td>
-                  <td style={styles.td}>{user.department}</td>
-                  <td style={styles.td}>
-                    <span style={getStatusStyle(user.status)}>
-                      {user.status}
-                    </span>
-                  </td>
-                  <td style={styles.td}>{user.permissions}</td>
-                  <td style={styles.td}>
-                    <button
-                      style={styles.editButton}
-                      onClick={() => handleEdit(user)}
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      style={styles.deleteButton}
-                      onClick={() => handleDelete(user.id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-
-              {filteredUsers.length === 0 && (
+        {loading ? (
+          <p>Loading users...</p>
+        ) : (
+          <div style={styles.tableWrapper}>
+            <table style={styles.table}>
+              <thead>
                 <tr>
-                  <td style={styles.empty} colSpan="8">
-                    No users found
-                  </td>
+                  <th style={styles.th}>Name</th>
+                  <th style={styles.th}>Email</th>
+                  <th style={styles.th}>Role</th>
+                  <th style={styles.th}>Status</th>
+                  <th style={styles.th}>Created</th>
+                  <th style={styles.th}>Actions</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+
+              <tbody>
+                {filteredUsers.map((user) => (
+                  <tr key={user._id}>
+                    <td style={styles.td}>{user.name}</td>
+                    <td style={styles.td}>{user.email}</td>
+
+                    <td style={styles.td}>
+                      <span style={getRoleStyle(user.role)}>
+                        {user.role}
+                      </span>
+                    </td>
+
+                    <td style={styles.td}>
+                      <span style={getStatusStyle(user.status)}>
+                        {user.status}
+                      </span>
+                    </td>
+
+                    <td style={styles.td}>
+                      {user.createdAt?.slice(0, 10)}
+                    </td>
+
+                    <td style={styles.td}>
+                      <button
+                        style={styles.editButton}
+                        onClick={() => handleEdit(user)}
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        style={styles.deleteButton}
+                        onClick={() => handleDelete(user._id)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+
+                {filteredUsers.length === 0 && (
+                  <tr>
+                    <td style={styles.empty} colSpan="6">
+                      No users found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -384,7 +354,6 @@ const getRoleStyle = (role) => {
     Sales: { background: "#dbeafe", color: "#1d4ed8" },
     Inventory: { background: "#fef3c7", color: "#92400e" },
     Accounts: { background: "#dcfce7", color: "#166534" },
-    Installation: { background: "#ffedd5", color: "#c2410c" },
     Service: { background: "#cffafe", color: "#0e7490" },
     Viewer: { background: "#f3f4f6", color: "#374151" },
   };
@@ -412,6 +381,13 @@ const styles = {
   subtitle: {
     marginTop: "6px",
     color: "#6b7280",
+  },
+  error: {
+    background: "#fee2e2",
+    color: "#b91c1c",
+    padding: "12px",
+    borderRadius: "10px",
+    marginBottom: "15px",
   },
   primaryButton: {
     background: "#008c45",
@@ -455,15 +431,6 @@ const styles = {
     borderRadius: "10px",
     border: "1px solid #d1d5db",
     fontSize: "14px",
-  },
-  textarea: {
-    width: "100%",
-    minHeight: "90px",
-    padding: "12px",
-    borderRadius: "10px",
-    border: "1px solid #d1d5db",
-    fontSize: "14px",
-    marginTop: "14px",
   },
   formActions: {
     display: "flex",
@@ -515,7 +482,7 @@ const styles = {
   table: {
     width: "100%",
     borderCollapse: "collapse",
-    minWidth: "1050px",
+    minWidth: "900px",
   },
   th: {
     textAlign: "left",
