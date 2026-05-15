@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const BASE_URL = "https://rj-solar-backend-production.up.railway.app/api/leads";
-rj-solar-backend-production.up.railway.app
+
 const getToken = () => {
   return localStorage.getItem("token");
 };
