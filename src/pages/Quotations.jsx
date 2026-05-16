@@ -500,12 +500,14 @@ const styles = {
     fontWeight: "700",
     cursor: "pointer",
   },
-  tableCard: {
-    background: "#fff",
-    padding: "22px",
-    borderRadius: "16px",
-    boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
-  },
+tableCard: {
+  background: "#fff",
+  padding: "22px",
+  borderRadius: "16px",
+  boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
+  overflow: "hidden",
+  width: "100%",
+},
   tableHeader: {
     display: "flex",
     justifyContent: "space-between",
