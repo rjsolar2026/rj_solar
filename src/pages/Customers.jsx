@@ -50,27 +50,18 @@ const Customers = () => {
 
   const filteredCustomers = customers.filter((customer) => {
     const searchText =
-      `${customer.name} ${customer.phone} ${customer.email} ${customer.city} ${customer.project} ${customer.paymentStatus} ${customer.serviceStatus}`
-        .toLowerCase();
+      `${customer.name} ${customer.phone} ${customer.email} ${customer.city} ${customer.project} ${customer.paymentStatus} ${customer.serviceStatus}`.toLowerCase();
 
     const installDate = customer.installationDate
       ? customer.installationDate.slice(0, 10)
       : "";
 
-    const matchesSearch = searchText.includes(search.toLowerCase());
-    const matchesPayment =
-      paymentFilter === "All" || customer.paymentStatus === paymentFilter;
-    const matchesService =
-      serviceFilter === "All" || customer.serviceStatus === serviceFilter;
-    const matchesFromDate = !fromDate || installDate >= fromDate;
-    const matchesToDate = !toDate || installDate <= toDate;
-
     return (
-      matchesSearch &&
-      matchesPayment &&
-      matchesService &&
-      matchesFromDate &&
-      matchesToDate
+      searchText.includes(search.toLowerCase()) &&
+      (paymentFilter === "All" || customer.paymentStatus === paymentFilter) &&
+      (serviceFilter === "All" || customer.serviceStatus === serviceFilter) &&
+      (!fromDate || installDate >= fromDate) &&
+      (!toDate || installDate <= toDate)
     );
   });
 
@@ -100,11 +91,7 @@ const Customers = () => {
   };
 
   const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
-
+    setForm({ ...form, [e.target.name]: e.target.value });
     setError("");
   };
 
@@ -333,7 +320,9 @@ const Customers = () => {
               <tbody>
                 {filteredCustomers.map((customer) => (
                   <tr key={customer._id}>
-                    <td style={styles.td}>{customer.createdAt ? customer.createdAt.slice(0, 10) : ""}</td>
+                    <td style={styles.td}>
+                      {customer.createdAt ? customer.createdAt.slice(0, 10) : ""}
+                    </td>
                     <td style={styles.td}>{customer.name}</td>
                     <td style={styles.td}>{customer.phone}</td>
                     <td style={styles.td}>{customer.email}</td>
@@ -421,44 +410,220 @@ const getServiceStyle = (status) => {
 };
 
 const styles = {
-  page: { background: "#f4f7fb", minHeight: "100vh", padding: "25px" },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px" },
-  title: { margin: 0, fontSize: "30px", color: "#111827" },
-  subtitle: { marginTop: "6px", color: "#6b7280" },
-  error: { background: "#fee2e2", color: "#b91c1c", padding: "12px", borderRadius: "10px", marginBottom: "15px" },
-  primaryButton: { background: "#008c45", color: "#fff", border: "none", padding: "12px 18px", borderRadius: "10px", fontWeight: "700", cursor: "pointer" },
-  summaryGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "18px", marginBottom: "25px" },
-  summaryCard: { background: "#fff", padding: "20px", borderRadius: "16px", boxShadow: "0 8px 20px rgba(0,0,0,0.06)" },
-  formCard: { background: "#fff", padding: "22px", borderRadius: "16px", boxShadow: "0 8px 20px rgba(0,0,0,0.06)", marginBottom: "25px" },
-  formTitle: { marginTop: 0 },
-  formGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" },
-  input: { width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid #d1d5db", fontSize: "14px" },
-  textarea: { width: "100%", minHeight: "90px", padding: "12px", borderRadius: "10px", border: "1px solid #d1d5db", fontSize: "14px", marginTop: "14px" },
-  formActions: { display: "flex", gap: "10px", marginTop: "14px" },
-  saveButton: { background: "#008c45", color: "#fff", border: "none", padding: "12px 18px", borderRadius: "10px", fontWeight: "700", cursor: "pointer" },
-  cancelButton: { background: "#111827", color: "#fff", border: "none", padding: "12px 18px", borderRadius: "10px", fontWeight: "700", cursor: "pointer" },
- tableCard: {
-  background: "#fff",
-  padding: "22px",
-  borderRadius: "16px",
-  boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
-  overflow: "hidden",
-  width: "100%",
-},
-  tableHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px", gap: "12px", flexWrap: "wrap" },
-  sectionTitle: { margin: 0 },
-  searchInput: { width: "280px", padding: "11px", borderRadius: "10px", border: "1px solid #d1d5db" },
-  filterRow: { display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "15px", alignItems: "end" },
-  filterLabel: { display: "block", fontSize: "12px", fontWeight: "700", color: "#374151", marginBottom: "5px" },
-  filterInput: { width: "170px", padding: "11px", borderRadius: "10px", border: "1px solid #d1d5db", background: "#fff" },
-  clearButton: { background: "#111827", color: "#fff", border: "none", padding: "12px 18px", borderRadius: "10px", fontWeight: "700", cursor: "pointer" },
-  tableWrapper: { overflowX: "auto" },
-  table: { width: "100%", borderCollapse: "collapse", minWidth: "1200px" },
-  th: { textAlign: "left", padding: "12px", background: "#f3f4f6", color: "#374151", fontSize: "14px" },
-  td: { padding: "12px", borderBottom: "1px solid #e5e7eb", color: "#374151", fontSize: "14px" },
-  editButton: { background: "#2563eb", color: "#fff", border: "none", padding: "7px 10px", borderRadius: "8px", cursor: "pointer", marginRight: "6px" },
-  deleteButton: { background: "#dc2626", color: "#fff", border: "none", padding: "7px 10px", borderRadius: "8px", cursor: "pointer" },
-  empty: { textAlign: "center", padding: "25px", color: "#6b7280" },
+  page: {
+    background: "#f4f7fb",
+    minHeight: "100vh",
+    padding: "25px",
+    overflowX: "hidden",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "25px",
+    gap: "15px",
+    flexWrap: "wrap",
+  },
+  title: {
+    margin: 0,
+    fontSize: "30px",
+    color: "#111827",
+  },
+  subtitle: {
+    marginTop: "6px",
+    color: "#6b7280",
+  },
+  error: {
+    background: "#fee2e2",
+    color: "#b91c1c",
+    padding: "12px",
+    borderRadius: "10px",
+    marginBottom: "15px",
+  },
+  primaryButton: {
+    background: "#008c45",
+    color: "#fff",
+    border: "none",
+    padding: "12px 18px",
+    borderRadius: "10px",
+    fontWeight: "700",
+    cursor: "pointer",
+  },
+  summaryGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+    gap: "18px",
+    marginBottom: "25px",
+  },
+  summaryCard: {
+    background: "#fff",
+    padding: "20px",
+    borderRadius: "16px",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
+  },
+  formCard: {
+    background: "#fff",
+    padding: "22px",
+    borderRadius: "16px",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
+    marginBottom: "25px",
+    overflow: "hidden",
+  },
+  formTitle: {
+    marginTop: 0,
+  },
+  formGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: "14px",
+  },
+  input: {
+    width: "100%",
+    padding: "12px",
+    borderRadius: "10px",
+    border: "1px solid #d1d5db",
+    fontSize: "14px",
+    boxSizing: "border-box",
+  },
+  textarea: {
+    width: "100%",
+    minHeight: "90px",
+    padding: "12px",
+    borderRadius: "10px",
+    border: "1px solid #d1d5db",
+    fontSize: "14px",
+    marginTop: "14px",
+    boxSizing: "border-box",
+  },
+  formActions: {
+    display: "flex",
+    gap: "10px",
+    marginTop: "14px",
+    flexWrap: "wrap",
+  },
+  saveButton: {
+    background: "#008c45",
+    color: "#fff",
+    border: "none",
+    padding: "12px 18px",
+    borderRadius: "10px",
+    fontWeight: "700",
+    cursor: "pointer",
+  },
+  cancelButton: {
+    background: "#111827",
+    color: "#fff",
+    border: "none",
+    padding: "12px 18px",
+    borderRadius: "10px",
+    fontWeight: "700",
+    cursor: "pointer",
+  },
+  tableCard: {
+    background: "#fff",
+    padding: "22px",
+    borderRadius: "16px",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
+    overflow: "hidden",
+    width: "100%",
+    boxSizing: "border-box",
+  },
+  tableHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "15px",
+    gap: "12px",
+    flexWrap: "wrap",
+  },
+  sectionTitle: {
+    margin: 0,
+  },
+  searchInput: {
+    width: "100%",
+    maxWidth: "300px",
+    padding: "11px",
+    borderRadius: "10px",
+    border: "1px solid #d1d5db",
+    boxSizing: "border-box",
+  },
+  filterRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+    gap: "12px",
+    marginBottom: "20px",
+    width: "100%",
+  },
+  filterLabel: {
+    display: "block",
+    fontSize: "12px",
+    fontWeight: "700",
+    color: "#374151",
+    marginBottom: "5px",
+  },
+  filterInput: {
+    width: "100%",
+    padding: "11px",
+    borderRadius: "10px",
+    border: "1px solid #d1d5db",
+    background: "#fff",
+    boxSizing: "border-box",
+  },
+  clearButton: {
+    background: "#111827",
+    color: "#fff",
+    border: "none",
+    padding: "12px 18px",
+    borderRadius: "10px",
+    fontWeight: "700",
+    cursor: "pointer",
+    height: "42px",
+    alignSelf: "end",
+  },
+  tableWrapper: {
+    width: "100%",
+    overflowX: "auto",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    minWidth: "1200px",
+  },
+  th: {
+    textAlign: "left",
+    padding: "12px",
+    background: "#f3f4f6",
+    color: "#374151",
+    fontSize: "14px",
+  },
+  td: {
+    padding: "12px",
+    borderBottom: "1px solid #e5e7eb",
+    color: "#374151",
+    fontSize: "14px",
+  },
+  editButton: {
+    background: "#2563eb",
+    color: "#fff",
+    border: "none",
+    padding: "7px 10px",
+    borderRadius: "8px",
+    cursor: "pointer",
+    marginRight: "6px",
+  },
+  deleteButton: {
+    background: "#dc2626",
+    color: "#fff",
+    border: "none",
+    padding: "7px 10px",
+    borderRadius: "8px",
+    cursor: "pointer",
+  },
+  empty: {
+    textAlign: "center",
+    padding: "25px",
+    color: "#6b7280",
+  },
 };
 
 export default Customers;

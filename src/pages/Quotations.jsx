@@ -1,38 +1,22 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import {
+  getQuotations,
+  createQuotation,
+  updateQuotation,
+  deleteQuotation,
+} from "../api/quotationApi";
 
 const Quotations = () => {
   const [search, setSearch] = useState("");
+  const [fromDate, setFromFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+
+  const [quotations, setQuotations] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-
-  const [quotations, setQuotations] = useState([
-    {
-      id: 1,
-      quoteNo: "RJQ-1001",
-      customer: "Amit Sharma",
-      phone: "9876543210",
-      projectType: "5kW Rooftop Solar",
-      systemSize: "5kW",
-      amount: 145000,
-      gst: 18,
-      status: "Sent",
-      validTill: "2026-05-15",
-      notes: "Includes panel, inverter, structure and installation.",
-    },
-    {
-      id: 2,
-      quoteNo: "RJQ-1002",
-      customer: "Priya Singh",
-      phone: "9123456780",
-      projectType: "Solar Street Light",
-      systemSize: "10 Lights",
-      amount: 58000,
-      gst: 18,
-      status: "Draft",
-      validTill: "2026-05-20",
-      notes: "Quotation for 10 solar street lights.",
-    },
-  ]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const [form, setForm] = useState({
     customer: "",
@@ -46,16 +30,47 @@ const Quotations = () => {
     notes: "",
   });
 
-  const filteredQuotations = quotations.filter((quote) =>
-    `${quote.quoteNo} ${quote.customer} ${quote.phone} ${quote.projectType} ${quote.status}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  );
+  const fetchQuotations = async () => {
+    try {
+      setLoading(true);
+      const data = await getQuotations();
+      setQuotations(data.quotations || []);
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to load quotations");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchQuotations();
+  }, []);
 
   const calculateFinalAmount = (amount, gst) => {
     const baseAmount = Number(amount) || 0;
     const gstPercent = Number(gst) || 0;
     return baseAmount + (baseAmount * gstPercent) / 100;
+  };
+
+  const filteredQuotations = quotations.filter((quote) => {
+    const searchText =
+      `${quote.quoteNo} ${quote.customer} ${quote.phone} ${quote.projectType} ${quote.status}`.toLowerCase();
+
+    const validDate = quote.validTill ? quote.validTill.slice(0, 10) : "";
+
+    return (
+      searchText.includes(search.toLowerCase()) &&
+      (statusFilter === "All" || quote.status === statusFilter) &&
+      (!fromDate || validDate >= fromDate) &&
+      (!toDate || validDate <= toDate)
+    );
+  });
+
+  const clearFilters = () => {
+    setSearch("");
+    setFromFromDate("");
+    setToDate("");
+    setStatusFilter("All");
   };
 
   const resetForm = () => {
@@ -79,60 +94,58 @@ const Quotations = () => {
       ...form,
       [e.target.name]: e.target.value,
     });
+    setError("");
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (editingId) {
-      setQuotations(
-        quotations.map((quote) =>
-          quote.id === editingId
-            ? {
-                ...quote,
-                ...form,
-                amount: Number(form.amount),
-                gst: Number(form.gst),
-              }
-            : quote
-        )
-      );
-    } else {
-      const newQuotation = {
-        id: Date.now(),
-        quoteNo: `RJQ-${Date.now().toString().slice(-5)}`,
-        ...form,
-        amount: Number(form.amount),
-        gst: Number(form.gst),
-      };
+    const payload = {
+      ...form,
+      amount: Number(form.amount),
+      gst: Number(form.gst),
+    };
 
-      setQuotations([newQuotation, ...quotations]);
+    try {
+      if (editingId) {
+        await updateQuotation(editingId, payload);
+      } else {
+        await createQuotation(payload);
+      }
+
+      await fetchQuotations();
+      resetForm();
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to save quotation");
     }
-
-    resetForm();
   };
 
   const handleEdit = (quote) => {
     setForm({
-      customer: quote.customer,
-      phone: quote.phone,
-      projectType: quote.projectType,
-      systemSize: quote.systemSize,
-      amount: quote.amount,
-      gst: quote.gst,
-      status: quote.status,
-      validTill: quote.validTill,
-      notes: quote.notes,
+      customer: quote.customer || "",
+      phone: quote.phone || "",
+      projectType: quote.projectType || "",
+      systemSize: quote.systemSize || "",
+      amount: quote.amount || "",
+      gst: quote.gst || "18",
+      status: quote.status || "Draft",
+      validTill: quote.validTill ? quote.validTill.slice(0, 10) : "",
+      notes: quote.notes || "",
     });
 
-    setEditingId(quote.id);
+    setEditingId(quote._id);
     setShowForm(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     const confirmDelete = window.confirm("Do you want to delete this quotation?");
-    if (confirmDelete) {
-      setQuotations(quotations.filter((quote) => quote.id !== id));
+    if (!confirmDelete) return;
+
+    try {
+      await deleteQuotation(id);
+      await fetchQuotations();
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to delete quotation");
     }
   };
 
@@ -151,6 +164,8 @@ const Quotations = () => {
         </button>
       </div>
 
+      {error && <p style={styles.error}>{error}</p>}
+
       <div style={styles.summaryGrid}>
         <div style={styles.summaryCard}>
           <p>Total Quotations</p>
@@ -158,13 +173,13 @@ const Quotations = () => {
         </div>
 
         <div style={styles.summaryCard}>
-          <p>Draft</p>
-          <h2>{quotations.filter((q) => q.status === "Draft").length}</h2>
+          <p>Filtered Quotations</p>
+          <h2>{filteredQuotations.length}</h2>
         </div>
 
         <div style={styles.summaryCard}>
-          <p>Sent</p>
-          <h2>{quotations.filter((q) => q.status === "Sent").length}</h2>
+          <p>Draft</p>
+          <h2>{quotations.filter((q) => q.status === "Draft").length}</h2>
         </div>
 
         <div style={styles.summaryCard}>
@@ -181,33 +196,10 @@ const Quotations = () => {
 
           <form onSubmit={handleSubmit}>
             <div style={styles.formGrid}>
-              <input
-                type="text"
-                name="customer"
-                placeholder="Customer Name"
-                value={form.customer}
-                onChange={handleChange}
-                style={styles.input}
-                required
-              />
+              <input type="text" name="customer" placeholder="Customer Name" value={form.customer} onChange={handleChange} style={styles.input} required />
+              <input type="text" name="phone" placeholder="Phone Number" value={form.phone} onChange={handleChange} style={styles.input} required />
 
-              <input
-                type="text"
-                name="phone"
-                placeholder="Phone Number"
-                value={form.phone}
-                onChange={handleChange}
-                style={styles.input}
-                required
-              />
-
-              <select
-                name="projectType"
-                value={form.projectType}
-                onChange={handleChange}
-                style={styles.input}
-                required
-              >
+              <select name="projectType" value={form.projectType} onChange={handleChange} style={styles.input} required>
                 <option value="">Select Project Type</option>
                 <option>3kW Rooftop Solar</option>
                 <option>5kW Rooftop Solar</option>
@@ -217,40 +209,13 @@ const Quotations = () => {
                 <option>Solar Water Pump</option>
               </select>
 
-              <input
-                type="text"
-                name="systemSize"
-                placeholder="System Size e.g. 5kW / 10 Lights"
-                value={form.systemSize}
-                onChange={handleChange}
-                style={styles.input}
-              />
+              <input type="text" name="systemSize" placeholder="System Size e.g. 5kW / 10 Lights" value={form.systemSize} onChange={handleChange} style={styles.input} />
 
-              <input
-                type="number"
-                name="amount"
-                placeholder="Base Amount"
-                value={form.amount}
-                onChange={handleChange}
-                style={styles.input}
-                required
-              />
+              <input type="number" name="amount" placeholder="Base Amount" value={form.amount} onChange={handleChange} style={styles.input} required />
 
-              <input
-                type="number"
-                name="gst"
-                placeholder="GST %"
-                value={form.gst}
-                onChange={handleChange}
-                style={styles.input}
-              />
+              <input type="number" name="gst" placeholder="GST %" value={form.gst} onChange={handleChange} style={styles.input} />
 
-              <select
-                name="status"
-                value={form.status}
-                onChange={handleChange}
-                style={styles.input}
-              >
+              <select name="status" value={form.status} onChange={handleChange} style={styles.input}>
                 <option>Draft</option>
                 <option>Sent</option>
                 <option>Approved</option>
@@ -258,13 +223,7 @@ const Quotations = () => {
                 <option>Converted</option>
               </select>
 
-              <input
-                type="date"
-                name="validTill"
-                value={form.validTill}
-                onChange={handleChange}
-                style={styles.input}
-              />
+              <input type="date" name="validTill" value={form.validTill} onChange={handleChange} style={styles.input} />
             </div>
 
             <textarea
@@ -276,8 +235,7 @@ const Quotations = () => {
             />
 
             <div style={styles.totalBox}>
-              Final Amount: ₹
-              {calculateFinalAmount(form.amount, form.gst).toLocaleString()}
+              Final Amount: ₹{calculateFinalAmount(form.amount, form.gst).toLocaleString()}
             </div>
 
             <div style={styles.formActions}>
@@ -306,71 +264,101 @@ const Quotations = () => {
           />
         </div>
 
-        <div style={styles.tableWrapper}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Quote No</th>
-                <th style={styles.th}>Customer</th>
-                <th style={styles.th}>Phone</th>
-                <th style={styles.th}>Project</th>
-                <th style={styles.th}>Size</th>
-                <th style={styles.th}>Base Amount</th>
-                <th style={styles.th}>GST</th>
-                <th style={styles.th}>Final Amount</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>Valid Till</th>
-                <th style={styles.th}>Actions</th>
-              </tr>
-            </thead>
+        <div style={styles.filterRow}>
+          <div>
+            <label style={styles.filterLabel}>From Valid Till</label>
+            <input type="date" value={fromDate} onChange={(e) => setFromFromDate(e.target.value)} style={styles.filterInput} />
+          </div>
 
-            <tbody>
-              {filteredQuotations.map((quote) => (
-                <tr key={quote.id}>
-                  <td style={styles.td}>{quote.quoteNo}</td>
-                  <td style={styles.td}>{quote.customer}</td>
-                  <td style={styles.td}>{quote.phone}</td>
-                  <td style={styles.td}>{quote.projectType}</td>
-                  <td style={styles.td}>{quote.systemSize}</td>
-                  <td style={styles.td}>₹{quote.amount.toLocaleString()}</td>
-                  <td style={styles.td}>{quote.gst}%</td>
-                  <td style={styles.td}>
-                    ₹{calculateFinalAmount(quote.amount, quote.gst).toLocaleString()}
-                  </td>
-                  <td style={styles.td}>
-                    <span style={getStatusStyle(quote.status)}>
-                      {quote.status}
-                    </span>
-                  </td>
-                  <td style={styles.td}>{quote.validTill}</td>
-                  <td style={styles.td}>
-                    <button
-                      style={styles.editButton}
-                      onClick={() => handleEdit(quote)}
-                    >
-                      Edit
-                    </button>
+          <div>
+            <label style={styles.filterLabel}>To Valid Till</label>
+            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={styles.filterInput} />
+          </div>
 
-                    <button
-                      style={styles.deleteButton}
-                      onClick={() => handleDelete(quote.id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
+          <div>
+            <label style={styles.filterLabel}>Status</label>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={styles.filterInput}>
+              <option>All</option>
+              <option>Draft</option>
+              <option>Sent</option>
+              <option>Approved</option>
+              <option>Rejected</option>
+              <option>Converted</option>
+            </select>
+          </div>
 
-              {filteredQuotations.length === 0 && (
-                <tr>
-                  <td style={styles.empty} colSpan="11">
-                    No quotations found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <button style={styles.clearButton} onClick={clearFilters}>
+            Clear Filters
+          </button>
         </div>
+
+        {loading ? (
+          <p>Loading quotations...</p>
+        ) : (
+          <div style={styles.tableWrapper}>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Created</th>
+                  <th style={styles.th}>Quote No</th>
+                  <th style={styles.th}>Customer</th>
+                  <th style={styles.th}>Phone</th>
+                  <th style={styles.th}>Project</th>
+                  <th style={styles.th}>Size</th>
+                  <th style={styles.th}>Base Amount</th>
+                  <th style={styles.th}>GST</th>
+                  <th style={styles.th}>Final Amount</th>
+                  <th style={styles.th}>Status</th>
+                  <th style={styles.th}>Valid Till</th>
+                  <th style={styles.th}>Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredQuotations.map((quote) => (
+                  <tr key={quote._id}>
+                    <td style={styles.td}>{quote.createdAt ? quote.createdAt.slice(0, 10) : ""}</td>
+                    <td style={styles.td}>{quote.quoteNo}</td>
+                    <td style={styles.td}>{quote.customer}</td>
+                    <td style={styles.td}>{quote.phone}</td>
+                    <td style={styles.td}>{quote.projectType}</td>
+                    <td style={styles.td}>{quote.systemSize}</td>
+                    <td style={styles.td}>₹{Number(quote.amount || 0).toLocaleString()}</td>
+                    <td style={styles.td}>{quote.gst}%</td>
+                    <td style={styles.td}>
+                      ₹{calculateFinalAmount(quote.amount, quote.gst).toLocaleString()}
+                    </td>
+                    <td style={styles.td}>
+                      <span style={getStatusStyle(quote.status)}>
+                        {quote.status}
+                      </span>
+                    </td>
+                    <td style={styles.td}>
+                      {quote.validTill ? quote.validTill.slice(0, 10) : ""}
+                    </td>
+                    <td style={styles.td}>
+                      <button style={styles.editButton} onClick={() => handleEdit(quote)}>
+                        Edit
+                      </button>
+
+                      <button style={styles.deleteButton} onClick={() => handleDelete(quote._id)}>
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+
+                {filteredQuotations.length === 0 && (
+                  <tr>
+                    <td style={styles.empty} colSpan="12">
+                      No quotations found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -401,22 +389,37 @@ const styles = {
     background: "#f4f7fb",
     minHeight: "100vh",
     padding: "25px",
+    overflowX: "hidden",
   },
+
   header: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: "25px",
+    gap: "15px",
+    flexWrap: "wrap",
   },
+
   title: {
     margin: 0,
     fontSize: "30px",
     color: "#111827",
   },
+
   subtitle: {
     marginTop: "6px",
     color: "#6b7280",
   },
+
+  error: {
+    background: "#fee2e2",
+    color: "#b91c1c",
+    padding: "12px",
+    borderRadius: "10px",
+    marginBottom: "15px",
+  },
+
   primaryButton: {
     background: "#008c45",
     color: "#fff",
@@ -426,40 +429,49 @@ const styles = {
     fontWeight: "700",
     cursor: "pointer",
   },
+
   summaryGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
     gap: "18px",
     marginBottom: "25px",
   },
+
   summaryCard: {
     background: "#fff",
     padding: "20px",
     borderRadius: "16px",
     boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
   },
+
   formCard: {
     background: "#fff",
     padding: "22px",
     borderRadius: "16px",
     boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
     marginBottom: "25px",
+    overflow: "hidden",
   },
+
   formTitle: {
     marginTop: 0,
   },
+
   formGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: "14px",
   },
+
   input: {
     width: "100%",
     padding: "12px",
     borderRadius: "10px",
     border: "1px solid #d1d5db",
     fontSize: "14px",
+    boxSizing: "border-box",
   },
+
   textarea: {
     width: "100%",
     minHeight: "90px",
@@ -468,7 +480,9 @@ const styles = {
     border: "1px solid #d1d5db",
     fontSize: "14px",
     marginTop: "14px",
+    boxSizing: "border-box",
   },
+
   totalBox: {
     marginTop: "14px",
     background: "#e8f8ef",
@@ -477,11 +491,14 @@ const styles = {
     borderRadius: "10px",
     fontWeight: "800",
   },
+
   formActions: {
     display: "flex",
     gap: "10px",
     marginTop: "14px",
+    flexWrap: "wrap",
   },
+
   saveButton: {
     background: "#008c45",
     color: "#fff",
@@ -491,6 +508,7 @@ const styles = {
     fontWeight: "700",
     cursor: "pointer",
   },
+
   cancelButton: {
     background: "#111827",
     color: "#fff",
@@ -500,37 +518,87 @@ const styles = {
     fontWeight: "700",
     cursor: "pointer",
   },
-tableCard: {
-  background: "#fff",
-  padding: "22px",
-  borderRadius: "16px",
-  boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
-  overflow: "hidden",
-  width: "100%",
-},
+
+  tableCard: {
+    background: "#fff",
+    padding: "22px",
+    borderRadius: "16px",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
+    overflow: "hidden",
+    width: "100%",
+    boxSizing: "border-box",
+  },
+
   tableHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: "15px",
+    gap: "12px",
+    flexWrap: "wrap",
   },
+
   sectionTitle: {
     margin: 0,
   },
+
   searchInput: {
-    width: "280px",
+    width: "100%",
+    maxWidth: "300px",
     padding: "11px",
     borderRadius: "10px",
     border: "1px solid #d1d5db",
+    boxSizing: "border-box",
   },
+
+  filterRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+    gap: "12px",
+    marginBottom: "20px",
+    width: "100%",
+  },
+
+  filterLabel: {
+    display: "block",
+    fontSize: "12px",
+    fontWeight: "700",
+    color: "#374151",
+    marginBottom: "5px",
+  },
+
+  filterInput: {
+    width: "100%",
+    padding: "11px",
+    borderRadius: "10px",
+    border: "1px solid #d1d5db",
+    background: "#fff",
+    boxSizing: "border-box",
+  },
+
+  clearButton: {
+    background: "#111827",
+    color: "#fff",
+    border: "none",
+    padding: "12px 18px",
+    borderRadius: "10px",
+    fontWeight: "700",
+    cursor: "pointer",
+    height: "42px",
+    alignSelf: "end",
+  },
+
   tableWrapper: {
+    width: "100%",
     overflowX: "auto",
   },
+
   table: {
     width: "100%",
     borderCollapse: "collapse",
-    minWidth: "1150px",
+    minWidth: "1300px",
   },
+
   th: {
     textAlign: "left",
     padding: "12px",
@@ -538,12 +606,14 @@ tableCard: {
     color: "#374151",
     fontSize: "14px",
   },
+
   td: {
     padding: "12px",
     borderBottom: "1px solid #e5e7eb",
     color: "#374151",
     fontSize: "14px",
   },
+
   editButton: {
     background: "#2563eb",
     color: "#fff",
@@ -553,6 +623,7 @@ tableCard: {
     cursor: "pointer",
     marginRight: "6px",
   },
+
   deleteButton: {
     background: "#dc2626",
     color: "#fff",
@@ -561,6 +632,7 @@ tableCard: {
     borderRadius: "8px",
     cursor: "pointer",
   },
+
   empty: {
     textAlign: "center",
     padding: "25px",
