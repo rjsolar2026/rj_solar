@@ -8,6 +8,11 @@ import {
 
 const Leads = () => {
   const [search, setSearch] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [priorityFilter, setPriorityFilter] = useState("All");
+
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -44,11 +49,36 @@ const Leads = () => {
     fetchLeads();
   }, []);
 
-  const filteredLeads = leads.filter((lead) =>
-    `${lead.name} ${lead.phone} ${lead.city} ${lead.requirement} ${lead.status}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  );
+  const filteredLeads = leads.filter((lead) => {
+    const searchText =
+      `${lead.name} ${lead.phone} ${lead.city} ${lead.requirement} ${lead.status} ${lead.priority}`
+        .toLowerCase();
+
+    const leadDate = lead.createdAt ? lead.createdAt.slice(0, 10) : "";
+
+    const matchesSearch = searchText.includes(search.toLowerCase());
+    const matchesStatus = statusFilter === "All" || lead.status === statusFilter;
+    const matchesPriority =
+      priorityFilter === "All" || lead.priority === priorityFilter;
+    const matchesFromDate = !fromDate || leadDate >= fromDate;
+    const matchesToDate = !toDate || leadDate <= toDate;
+
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesPriority &&
+      matchesFromDate &&
+      matchesToDate
+    );
+  });
+
+  const clearFilters = () => {
+    setSearch("");
+    setFromDate("");
+    setToDate("");
+    setStatusFilter("All");
+    setPriorityFilter("All");
+  };
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -109,7 +139,6 @@ const Leads = () => {
 
   const handleDelete = async (id) => {
     const confirmDelete = window.confirm("Do you want to delete this lead?");
-
     if (!confirmDelete) return;
 
     try {
@@ -144,15 +173,13 @@ const Leads = () => {
         </div>
 
         <div style={styles.summaryCard}>
-          <p>New Leads</p>
-          <h2>{leads.filter((lead) => lead.status === "New Lead").length}</h2>
+          <p>Filtered Leads</p>
+          <h2>{filteredLeads.length}</h2>
         </div>
 
         <div style={styles.summaryCard}>
-          <p>Quotation Sent</p>
-          <h2>
-            {leads.filter((lead) => lead.status === "Quotation Sent").length}
-          </h2>
+          <p>New Leads</p>
+          <h2>{leads.filter((lead) => lead.status === "New Lead").length}</h2>
         </div>
 
         <div style={styles.summaryCard}>
@@ -233,6 +260,64 @@ const Leads = () => {
           />
         </div>
 
+        <div style={styles.filterRow}>
+          <div>
+            <label style={styles.filterLabel}>From Date</label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              style={styles.filterInput}
+            />
+          </div>
+
+          <div>
+            <label style={styles.filterLabel}>To Date</label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              style={styles.filterInput}
+            />
+          </div>
+
+          <div>
+            <label style={styles.filterLabel}>Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={styles.filterInput}
+            >
+              <option>All</option>
+              <option>New Lead</option>
+              <option>Interested</option>
+              <option>Site Visit</option>
+              <option>Quotation Sent</option>
+              <option>Follow-up</option>
+              <option>Converted</option>
+              <option>Lost</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={styles.filterLabel}>Priority</label>
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              style={styles.filterInput}
+            >
+              <option>All</option>
+              <option>High</option>
+              <option>Medium</option>
+              <option>Low</option>
+            </select>
+          </div>
+
+          <button style={styles.clearButton} onClick={clearFilters}>
+            Clear Filters
+          </button>
+        </div>
+
         {loading ? (
           <p>Loading leads...</p>
         ) : (
@@ -240,6 +325,7 @@ const Leads = () => {
             <table style={styles.table}>
               <thead>
                 <tr>
+                  <th style={styles.th}>Created</th>
                   <th style={styles.th}>Name</th>
                   <th style={styles.th}>Phone</th>
                   <th style={styles.th}>City</th>
@@ -256,6 +342,7 @@ const Leads = () => {
               <tbody>
                 {filteredLeads.map((lead) => (
                   <tr key={lead._id}>
+                    <td style={styles.td}>{lead.createdAt ? lead.createdAt.slice(0, 10) : ""}</td>
                     <td style={styles.td}>{lead.name}</td>
                     <td style={styles.td}>{lead.phone}</td>
                     <td style={styles.td}>{lead.city}</td>
@@ -287,7 +374,7 @@ const Leads = () => {
 
                 {filteredLeads.length === 0 && (
                   <tr>
-                    <td style={styles.empty} colSpan="10">
+                    <td style={styles.empty} colSpan="11">
                       No leads found
                     </td>
                   </tr>
@@ -359,11 +446,15 @@ const styles = {
   saveButton: { background: "#008c45", color: "#fff", border: "none", padding: "12px 18px", borderRadius: "10px", fontWeight: "700", cursor: "pointer" },
   cancelButton: { background: "#111827", color: "#fff", border: "none", padding: "12px 18px", borderRadius: "10px", fontWeight: "700", cursor: "pointer" },
   tableCard: { background: "#fff", padding: "22px", borderRadius: "16px", boxShadow: "0 8px 20px rgba(0,0,0,0.06)" },
-  tableHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" },
+  tableHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px", gap: "12px", flexWrap: "wrap" },
   sectionTitle: { margin: 0 },
   searchInput: { width: "260px", padding: "11px", borderRadius: "10px", border: "1px solid #d1d5db" },
+  filterRow: { display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "15px", alignItems: "end" },
+  filterLabel: { display: "block", fontSize: "12px", fontWeight: "700", color: "#374151", marginBottom: "5px" },
+  filterInput: { width: "170px", padding: "11px", borderRadius: "10px", border: "1px solid #d1d5db", background: "#fff" },
+  clearButton: { background: "#111827", color: "#fff", border: "none", padding: "12px 18px", borderRadius: "10px", fontWeight: "700", cursor: "pointer" },
   tableWrapper: { overflowX: "auto" },
-  table: { width: "100%", borderCollapse: "collapse", minWidth: "1050px" },
+  table: { width: "100%", borderCollapse: "collapse", minWidth: "1200px" },
   th: { textAlign: "left", padding: "12px", background: "#f3f4f6", color: "#374151", fontSize: "14px" },
   td: { padding: "12px", borderBottom: "1px solid #e5e7eb", color: "#374151", fontSize: "14px" },
   editButton: { background: "#2563eb", color: "#fff", border: "none", padding: "7px 10px", borderRadius: "8px", cursor: "pointer", marginRight: "6px" },
