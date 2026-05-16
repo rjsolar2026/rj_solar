@@ -98,7 +98,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <button style={styles.primaryButton}>+ Add New Lead</button>
+        
       </div>
 
       <div style={styles.statsGrid}>
