@@ -8,6 +8,12 @@ import {
 
 const Orders = () => {
   const [search, setSearch] = useState("");
+  const [fromOrderDate, setFromOrderDate] = useState("");
+  const [toOrderDate, setToOrderDate] = useState("");
+  const [fromDeliveryDate, setFromDeliveryDate] = useState("");
+  const [toDeliveryDate, setToDeliveryDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+
   const [orders, setOrders] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -41,16 +47,47 @@ const Orders = () => {
     fetchOrders();
   }, []);
 
-  const filteredOrders = orders.filter((order) =>
-    `${order.orderNo} ${order.customer} ${order.phone} ${order.project} ${order.status}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  );
+  const filteredOrders = orders.filter((order) => {
+    const searchText = `${order.orderNo} ${order.customer} ${order.phone} ${order.project} ${order.status}`.toLowerCase();
+
+    const orderDate = order.orderDate ? order.orderDate.slice(0, 10) : "";
+    const deliveryDate = order.deliveryDate ? order.deliveryDate.slice(0, 10) : "";
+
+    const matchesSearch = searchText.includes(search.toLowerCase());
+    const matchesStatus = statusFilter === "All" || order.status === statusFilter;
+    const matchesFromOrder = !fromOrderDate || orderDate >= fromOrderDate;
+    const matchesToOrder = !toOrderDate || orderDate <= toOrderDate;
+    const matchesFromDelivery = !fromDeliveryDate || deliveryDate >= fromDeliveryDate;
+    const matchesToDelivery = !toDeliveryDate || deliveryDate <= toDeliveryDate;
+
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesFromOrder &&
+      matchesToOrder &&
+      matchesFromDelivery &&
+      matchesToDelivery
+    );
+  });
 
   const totalOrderValue = orders.reduce(
     (sum, order) => sum + Number(order.amount || 0),
     0
   );
+
+  const filteredOrderValue = filteredOrders.reduce(
+    (sum, order) => sum + Number(order.amount || 0),
+    0
+  );
+
+  const clearFilters = () => {
+    setSearch("");
+    setFromOrderDate("");
+    setToOrderDate("");
+    setFromDeliveryDate("");
+    setToDeliveryDate("");
+    setStatusFilter("All");
+  };
 
   const resetForm = () => {
     setForm({
@@ -141,18 +178,18 @@ const Orders = () => {
         </div>
 
         <div style={styles.summaryCard}>
-          <p>Order Value</p>
+          <p>Filtered Orders</p>
+          <h2>{filteredOrders.length}</h2>
+        </div>
+
+        <div style={styles.summaryCard}>
+          <p>Total Order Value</p>
           <h2>₹{totalOrderValue.toLocaleString()}</h2>
         </div>
 
         <div style={styles.summaryCard}>
-          <p>Pending</p>
-          <h2>{orders.filter((o) => o.status === "Pending").length}</h2>
-        </div>
-
-        <div style={styles.summaryCard}>
-          <p>Completed</p>
-          <h2>{orders.filter((o) => o.status === "Completed").length}</h2>
+          <p>Filtered Value</p>
+          <h2>₹{filteredOrderValue.toLocaleString()}</h2>
         </div>
       </div>
 
@@ -164,33 +201,10 @@ const Orders = () => {
 
           <form onSubmit={handleSubmit}>
             <div style={styles.formGrid}>
-              <input
-                type="text"
-                name="customer"
-                placeholder="Customer Name"
-                value={form.customer}
-                onChange={handleChange}
-                style={styles.input}
-                required
-              />
+              <input type="text" name="customer" placeholder="Customer Name" value={form.customer} onChange={handleChange} style={styles.input} required />
+              <input type="text" name="phone" placeholder="Phone Number" value={form.phone} onChange={handleChange} style={styles.input} required />
 
-              <input
-                type="text"
-                name="phone"
-                placeholder="Phone Number"
-                value={form.phone}
-                onChange={handleChange}
-                style={styles.input}
-                required
-              />
-
-              <select
-                name="project"
-                value={form.project}
-                onChange={handleChange}
-                style={styles.input}
-                required
-              >
+              <select name="project" value={form.project} onChange={handleChange} style={styles.input} required>
                 <option value="">Select Project</option>
                 <option>3kW Rooftop Solar</option>
                 <option>5kW Rooftop Solar</option>
@@ -200,22 +214,9 @@ const Orders = () => {
                 <option>Solar Water Pump</option>
               </select>
 
-              <input
-                type="number"
-                name="amount"
-                placeholder="Order Amount"
-                value={form.amount}
-                onChange={handleChange}
-                style={styles.input}
-                required
-              />
+              <input type="number" name="amount" placeholder="Order Amount" value={form.amount} onChange={handleChange} style={styles.input} required />
 
-              <select
-                name="status"
-                value={form.status}
-                onChange={handleChange}
-                style={styles.input}
-              >
+              <select name="status" value={form.status} onChange={handleChange} style={styles.input}>
                 <option>Pending</option>
                 <option>Material Ready</option>
                 <option>Dispatched</option>
@@ -225,21 +226,8 @@ const Orders = () => {
                 <option>Cancelled</option>
               </select>
 
-              <input
-                type="date"
-                name="orderDate"
-                value={form.orderDate}
-                onChange={handleChange}
-                style={styles.input}
-              />
-
-              <input
-                type="date"
-                name="deliveryDate"
-                value={form.deliveryDate}
-                onChange={handleChange}
-                style={styles.input}
-              />
+              <input type="date" name="orderDate" value={form.orderDate} onChange={handleChange} style={styles.input} />
+              <input type="date" name="deliveryDate" value={form.deliveryDate} onChange={handleChange} style={styles.input} />
             </div>
 
             <textarea
@@ -276,6 +264,70 @@ const Orders = () => {
           />
         </div>
 
+        <div style={styles.filterRow}>
+          <div>
+            <label style={styles.filterLabel}>From Order Date</label>
+            <input
+              type="date"
+              value={fromOrderDate}
+              onChange={(e) => setFromOrderDate(e.target.value)}
+              style={styles.filterInput}
+            />
+          </div>
+
+          <div>
+            <label style={styles.filterLabel}>To Order Date</label>
+            <input
+              type="date"
+              value={toOrderDate}
+              onChange={(e) => setToOrderDate(e.target.value)}
+              style={styles.filterInput}
+            />
+          </div>
+
+          <div>
+            <label style={styles.filterLabel}>From Delivery</label>
+            <input
+              type="date"
+              value={fromDeliveryDate}
+              onChange={(e) => setFromDeliveryDate(e.target.value)}
+              style={styles.filterInput}
+            />
+          </div>
+
+          <div>
+            <label style={styles.filterLabel}>To Delivery</label>
+            <input
+              type="date"
+              value={toDeliveryDate}
+              onChange={(e) => setToDeliveryDate(e.target.value)}
+              style={styles.filterInput}
+            />
+          </div>
+
+          <div>
+            <label style={styles.filterLabel}>Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={styles.filterInput}
+            >
+              <option>All</option>
+              <option>Pending</option>
+              <option>Material Ready</option>
+              <option>Dispatched</option>
+              <option>Installation Scheduled</option>
+              <option>Installed</option>
+              <option>Completed</option>
+              <option>Cancelled</option>
+            </select>
+          </div>
+
+          <button style={styles.clearButton} onClick={clearFilters}>
+            Clear Filters
+          </button>
+        </div>
+
         {loading ? (
           <p>Loading orders...</p>
         ) : (
@@ -283,6 +335,7 @@ const Orders = () => {
             <table style={styles.table}>
               <thead>
                 <tr>
+                  <th style={styles.th}>Created</th>
                   <th style={styles.th}>Order No</th>
                   <th style={styles.th}>Customer</th>
                   <th style={styles.th}>Phone</th>
@@ -298,13 +351,12 @@ const Orders = () => {
               <tbody>
                 {filteredOrders.map((order) => (
                   <tr key={order._id}>
+                    <td style={styles.td}>{order.createdAt ? order.createdAt.slice(0, 10) : ""}</td>
                     <td style={styles.td}>{order.orderNo}</td>
                     <td style={styles.td}>{order.customer}</td>
                     <td style={styles.td}>{order.phone}</td>
                     <td style={styles.td}>{order.project}</td>
-                    <td style={styles.td}>
-                      ₹{Number(order.amount || 0).toLocaleString()}
-                    </td>
+                    <td style={styles.td}>₹{Number(order.amount || 0).toLocaleString()}</td>
                     <td style={styles.td}>
                       <span style={getStatusStyle(order.status)}>
                         {order.status}
@@ -314,22 +366,14 @@ const Orders = () => {
                       {order.orderDate ? order.orderDate.slice(0, 10) : ""}
                     </td>
                     <td style={styles.td}>
-                      {order.deliveryDate
-                        ? order.deliveryDate.slice(0, 10)
-                        : ""}
+                      {order.deliveryDate ? order.deliveryDate.slice(0, 10) : ""}
                     </td>
                     <td style={styles.td}>
-                      <button
-                        style={styles.editButton}
-                        onClick={() => handleEdit(order)}
-                      >
+                      <button style={styles.editButton} onClick={() => handleEdit(order)}>
                         Edit
                       </button>
 
-                      <button
-                        style={styles.deleteButton}
-                        onClick={() => handleDelete(order._id)}
-                      >
+                      <button style={styles.deleteButton} onClick={() => handleDelete(order._id)}>
                         Delete
                       </button>
                     </td>
@@ -338,7 +382,7 @@ const Orders = () => {
 
                 {filteredOrders.length === 0 && (
                   <tr>
-                    <td style={styles.empty} colSpan="9">
+                    <td style={styles.empty} colSpan="10">
                       No orders found
                     </td>
                   </tr>
@@ -488,6 +532,8 @@ const styles = {
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: "15px",
+    gap: "12px",
+    flexWrap: "wrap",
   },
   sectionTitle: {
     margin: 0,
@@ -498,13 +544,43 @@ const styles = {
     borderRadius: "10px",
     border: "1px solid #d1d5db",
   },
+  filterRow: {
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
+    marginBottom: "15px",
+    alignItems: "end",
+  },
+  filterLabel: {
+    display: "block",
+    fontSize: "12px",
+    fontWeight: "700",
+    color: "#374151",
+    marginBottom: "5px",
+  },
+  filterInput: {
+    width: "170px",
+    padding: "11px",
+    borderRadius: "10px",
+    border: "1px solid #d1d5db",
+    background: "#fff",
+  },
+  clearButton: {
+    background: "#111827",
+    color: "#fff",
+    border: "none",
+    padding: "12px 18px",
+    borderRadius: "10px",
+    fontWeight: "700",
+    cursor: "pointer",
+  },
   tableWrapper: {
     overflowX: "auto",
   },
   table: {
     width: "100%",
     borderCollapse: "collapse",
-    minWidth: "1050px",
+    minWidth: "1200px",
   },
   th: {
     textAlign: "left",
