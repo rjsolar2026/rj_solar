@@ -2,6 +2,10 @@ import React, { useState } from "react";
 
 const Quotations = () => {
   const [search, setSearch] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
@@ -46,16 +50,31 @@ const Quotations = () => {
     notes: "",
   });
 
-  const filteredQuotations = quotations.filter((quote) =>
-    `${quote.quoteNo} ${quote.customer} ${quote.phone} ${quote.projectType} ${quote.status}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  );
+  const filteredQuotations = quotations.filter((quote) => {
+    const searchText =
+      `${quote.quoteNo} ${quote.customer} ${quote.phone} ${quote.projectType} ${quote.status}`.toLowerCase();
+
+    const validDate = quote.validTill || "";
+
+    return (
+      searchText.includes(search.toLowerCase()) &&
+      (statusFilter === "All" || quote.status === statusFilter) &&
+      (!fromDate || validDate >= fromDate) &&
+      (!toDate || validDate <= toDate)
+    );
+  });
 
   const calculateFinalAmount = (amount, gst) => {
     const baseAmount = Number(amount) || 0;
     const gstPercent = Number(gst) || 0;
     return baseAmount + (baseAmount * gstPercent) / 100;
+  };
+
+  const clearFilters = () => {
+    setSearch("");
+    setFromDate("");
+    setToDate("");
+    setStatusFilter("All");
   };
 
   const resetForm = () => {
@@ -114,15 +133,15 @@ const Quotations = () => {
 
   const handleEdit = (quote) => {
     setForm({
-      customer: quote.customer,
-      phone: quote.phone,
-      projectType: quote.projectType,
-      systemSize: quote.systemSize,
-      amount: quote.amount,
-      gst: quote.gst,
-      status: quote.status,
-      validTill: quote.validTill,
-      notes: quote.notes,
+      customer: quote.customer || "",
+      phone: quote.phone || "",
+      projectType: quote.projectType || "",
+      systemSize: quote.systemSize || "",
+      amount: quote.amount || "",
+      gst: quote.gst || "18",
+      status: quote.status || "Draft",
+      validTill: quote.validTill || "",
+      notes: quote.notes || "",
     });
 
     setEditingId(quote.id);
@@ -158,13 +177,13 @@ const Quotations = () => {
         </div>
 
         <div style={styles.summaryCard}>
-          <p>Draft</p>
-          <h2>{quotations.filter((q) => q.status === "Draft").length}</h2>
+          <p>Filtered Quotations</p>
+          <h2>{filteredQuotations.length}</h2>
         </div>
 
         <div style={styles.summaryCard}>
-          <p>Sent</p>
-          <h2>{quotations.filter((q) => q.status === "Sent").length}</h2>
+          <p>Draft</p>
+          <h2>{quotations.filter((q) => q.status === "Draft").length}</h2>
         </div>
 
         <div style={styles.summaryCard}>
@@ -306,6 +325,48 @@ const Quotations = () => {
           />
         </div>
 
+        <div style={styles.filterRow}>
+          <div>
+            <label style={styles.filterLabel}>From Valid Till</label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              style={styles.filterInput}
+            />
+          </div>
+
+          <div>
+            <label style={styles.filterLabel}>To Valid Till</label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              style={styles.filterInput}
+            />
+          </div>
+
+          <div>
+            <label style={styles.filterLabel}>Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={styles.filterInput}
+            >
+              <option>All</option>
+              <option>Draft</option>
+              <option>Sent</option>
+              <option>Approved</option>
+              <option>Rejected</option>
+              <option>Converted</option>
+            </select>
+          </div>
+
+          <button style={styles.clearButton} onClick={clearFilters}>
+            Clear Filters
+          </button>
+        </div>
+
         <div style={styles.tableWrapper}>
           <table style={styles.table}>
             <thead>
@@ -335,7 +396,11 @@ const Quotations = () => {
                   <td style={styles.td}>₹{quote.amount.toLocaleString()}</td>
                   <td style={styles.td}>{quote.gst}%</td>
                   <td style={styles.td}>
-                    ₹{calculateFinalAmount(quote.amount, quote.gst).toLocaleString()}
+                    ₹
+                    {calculateFinalAmount(
+                      quote.amount,
+                      quote.gst
+                    ).toLocaleString()}
                   </td>
                   <td style={styles.td}>
                     <span style={getStatusStyle(quote.status)}>
@@ -401,22 +466,29 @@ const styles = {
     background: "#f4f7fb",
     minHeight: "100vh",
     padding: "25px",
+    overflowX: "hidden",
   },
+
   header: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: "25px",
+    gap: "15px",
+    flexWrap: "wrap",
   },
+
   title: {
     margin: 0,
     fontSize: "30px",
     color: "#111827",
   },
+
   subtitle: {
     marginTop: "6px",
     color: "#6b7280",
   },
+
   primaryButton: {
     background: "#008c45",
     color: "#fff",
@@ -426,40 +498,49 @@ const styles = {
     fontWeight: "700",
     cursor: "pointer",
   },
+
   summaryGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
     gap: "18px",
     marginBottom: "25px",
   },
+
   summaryCard: {
     background: "#fff",
     padding: "20px",
     borderRadius: "16px",
     boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
   },
+
   formCard: {
     background: "#fff",
     padding: "22px",
     borderRadius: "16px",
     boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
     marginBottom: "25px",
+    overflow: "hidden",
   },
+
   formTitle: {
     marginTop: 0,
   },
+
   formGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: "14px",
   },
+
   input: {
     width: "100%",
     padding: "12px",
     borderRadius: "10px",
     border: "1px solid #d1d5db",
     fontSize: "14px",
+    boxSizing: "border-box",
   },
+
   textarea: {
     width: "100%",
     minHeight: "90px",
@@ -468,7 +549,9 @@ const styles = {
     border: "1px solid #d1d5db",
     fontSize: "14px",
     marginTop: "14px",
+    boxSizing: "border-box",
   },
+
   totalBox: {
     marginTop: "14px",
     background: "#e8f8ef",
@@ -477,11 +560,14 @@ const styles = {
     borderRadius: "10px",
     fontWeight: "800",
   },
+
   formActions: {
     display: "flex",
     gap: "10px",
     marginTop: "14px",
+    flexWrap: "wrap",
   },
+
   saveButton: {
     background: "#008c45",
     color: "#fff",
@@ -491,6 +577,7 @@ const styles = {
     fontWeight: "700",
     cursor: "pointer",
   },
+
   cancelButton: {
     background: "#111827",
     color: "#fff",
@@ -500,37 +587,87 @@ const styles = {
     fontWeight: "700",
     cursor: "pointer",
   },
-tableCard: {
-  background: "#fff",
-  padding: "22px",
-  borderRadius: "16px",
-  boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
-  overflow: "hidden",
-  width: "100%",
-},
+
+  tableCard: {
+    background: "#fff",
+    padding: "22px",
+    borderRadius: "16px",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
+    overflow: "hidden",
+    width: "100%",
+    boxSizing: "border-box",
+  },
+
   tableHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: "15px",
+    gap: "12px",
+    flexWrap: "wrap",
   },
+
   sectionTitle: {
     margin: 0,
   },
+
   searchInput: {
-    width: "280px",
+    width: "100%",
+    maxWidth: "300px",
     padding: "11px",
     borderRadius: "10px",
     border: "1px solid #d1d5db",
+    boxSizing: "border-box",
   },
+
+  filterRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+    gap: "12px",
+    marginBottom: "20px",
+    width: "100%",
+  },
+
+  filterLabel: {
+    display: "block",
+    fontSize: "12px",
+    fontWeight: "700",
+    color: "#374151",
+    marginBottom: "5px",
+  },
+
+  filterInput: {
+    width: "100%",
+    padding: "11px",
+    borderRadius: "10px",
+    border: "1px solid #d1d5db",
+    background: "#fff",
+    boxSizing: "border-box",
+  },
+
+  clearButton: {
+    background: "#111827",
+    color: "#fff",
+    border: "none",
+    padding: "12px 18px",
+    borderRadius: "10px",
+    fontWeight: "700",
+    cursor: "pointer",
+    height: "42px",
+    alignSelf: "end",
+  },
+
   tableWrapper: {
+    width: "100%",
     overflowX: "auto",
   },
+
   table: {
     width: "100%",
     borderCollapse: "collapse",
     minWidth: "1150px",
   },
+
   th: {
     textAlign: "left",
     padding: "12px",
@@ -538,12 +675,14 @@ tableCard: {
     color: "#374151",
     fontSize: "14px",
   },
+
   td: {
     padding: "12px",
     borderBottom: "1px solid #e5e7eb",
     color: "#374151",
     fontSize: "14px",
   },
+
   editButton: {
     background: "#2563eb",
     color: "#fff",
@@ -553,6 +692,7 @@ tableCard: {
     cursor: "pointer",
     marginRight: "6px",
   },
+
   deleteButton: {
     background: "#dc2626",
     color: "#fff",
@@ -561,6 +701,7 @@ tableCard: {
     borderRadius: "8px",
     cursor: "pointer",
   },
+
   empty: {
     textAlign: "center",
     padding: "25px",
